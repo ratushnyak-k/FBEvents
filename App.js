@@ -1,4 +1,5 @@
 import React from 'react';
+import {schema, normalize} from 'normalizr';
 import MapView from 'react-native-maps';
 import {
   StyleSheet,
@@ -6,10 +7,10 @@ import {
   Text,
   Dimensions,
   TouchableOpacity,
-  Alert
+  Linking,
 } from 'react-native';
 import axios from 'axios';
-import {merge} from 'lodash';
+import {mergeWith} from 'lodash';
 
 const flagPinkImg = {uri: 'https://png.icons8.com/dona-sarkar/color/50'};
 
@@ -36,7 +37,10 @@ class App extends React.Component {
         latitudeDelta: LATITUDE_DELTA,
         longitudeDelta: LONGITUDE_DELTA,
       },
-      markers: [],
+      normalizedEvents: {
+        mappedData: {},
+        ids: [],
+      },
       distance: 100,
     };
 
@@ -59,7 +63,7 @@ class App extends React.Component {
 
   setCurrentPosition(position) {
     return {
-      region: merge({}, this.state.region, {
+      region: mergeWith({}, this.state.region, {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       })
@@ -78,10 +82,22 @@ class App extends React.Component {
       .then((response) => {
         this.setState(
           () => {
+            const event = new schema.Entity('events');
+
+            const events = {
+              events: [event]
+            };
+            const normalizedData = normalize(response.data, events);
+
             return {
-              markers: merge([], this.state.markers, response.data.events.map((event) => {
-                return event
-              }))
+              normalizedEvents: mergeWith({}, this.state.normalizedEvents, {
+                mappedData: normalizedData.entities.events,
+                ids: normalizedData.result.events,
+              }, (objValue, srcValue) => {
+                if (Array.isArray(objValue)) {
+                  return srcValue;
+                }
+              })
             }
           },
           () => {
@@ -97,23 +113,26 @@ class App extends React.Component {
   setFilter(distance) {
     this.setState(
       () => {
-        return merge({}, this.state, {
+        return mergeWith({}, this.state, {
           distance,
           region: {
             latitudeDelta: deltasByDistance[distance],
             longitudeDelta: +(deltasByDistance[distance] * ASPECT_RATIO).toFixed(3),
           }
         })
+      },
+      () => {
+        this.getNearbyEvents();
       }
     );
-    this.getNearbyEvents();
   }
 
-  ch(e) {
-    console.log(e);
+  onCalloutPress(id) {
+    Linking.openURL(`https://www.facebook.com/events/${id}/`);
   }
 
   render() {
+    const {mappedData} = this.state.normalizedEvents;
     return (
       <View style={styles.container}>
         {
@@ -126,7 +145,6 @@ class App extends React.Component {
             showsCompass={true}
             showScale={true}
             loadingEnabled={true}
-            onRegionChange={this.ch}
           >
             <MapView.Marker
               image={flagPinkImg}
@@ -148,16 +166,16 @@ class App extends React.Component {
               strokeWidth={3}
             />
             {
-              this.state.markers.map(marker => (
+              Object.keys(mappedData).map(event => (
                 <MapView.Marker
-                  key={marker.id}
-                  image={{uri: marker.profilePicture}}
-                  title={marker.name}
-                  description={marker.description}
+                  key={mappedData[event].id}
+                  title={mappedData[event].name}
+                  description={mappedData[event].description}
                   coordinate={{
-                    latitude: marker.venue.location.latitude,
-                    longitude: marker.venue.location.longitude,
+                    latitude: mappedData[event].venue.location.latitude,
+                    longitude: mappedData[event].venue.location.longitude,
                   }}
+                  onCalloutPress={this.onCalloutPress.bind(this, mappedData[event].id)}
                 />
               ))
             }

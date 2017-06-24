@@ -9,6 +9,7 @@
 	"dependencies": {
 		"axios": "^0.16.2",
 		"lodash": "^4.17.4",
+		"normalizr": "^3.2.3",
 		"react": "16.0.0-alpha.12",
 		"react-native": "0.45.1",
 		"react-native-maps": "^0.15.2"
