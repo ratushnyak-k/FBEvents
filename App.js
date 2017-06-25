@@ -8,6 +8,7 @@ import {
   Dimensions,
   TouchableOpacity,
   Linking,
+  PermissionsAndroid
 } from 'react-native';
 import axios from 'axios';
 import {mergeWith} from 'lodash';
@@ -46,9 +47,31 @@ class App extends React.Component {
 
   }
 
-  componentDidMount() {
+  async componentDidMount() {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          'title': 'Enable location',
+          'message': 'Location is good \o/',
+        },
+      );
+
+      if (granted) {
+        console.log('You can use the location');
+        this.watchLocation();
+      } else {
+        console.log('Location permission denied');
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  watchLocation() {
     navigator.geolocation.watchPosition(
       (position) => {
+        console.log(position);
         this.setState(
           this.setCurrentPosition(position),
           () => {
@@ -57,7 +80,7 @@ class App extends React.Component {
         )
       },
       (error) => alert(error.message),
-      {enableHighAccuracy: true, distanceFilter: 1, timeout: 1000}
+      {enableHighAccuracy: false}
     );
   }
 
