@@ -8,11 +8,14 @@
 	},
 	"dependencies": {
 		"axios": "^0.16.2",
+		"flux": "^3.1.2",
 		"lodash": "^4.17.4",
 		"normalizr": "^3.2.3",
 		"react": "16.0.0-alpha.12",
 		"react-native": "0.45.1",
-		"react-native-maps": "^0.15.2"
+		"react-native-android-location": "^1.0.2",
+		"react-native-maps": "^0.15.2",
+		"react-navigation": "^1.0.0-beta.11"
 	},
 	"devDependencies": {
 		"babel-jest": "20.0.3",
