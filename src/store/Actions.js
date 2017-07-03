@@ -10,6 +10,13 @@ const Actions = {
     });
   },
 
+  setCurrentLocation(data) {
+    Dispatcher.dispatchViewAction({
+      type: ActionTypes.SET_CURRENT_LOCATION,
+      payload: data,
+    });
+  },
+
   setFilter(data) {
     Dispatcher.dispatchViewAction({
       type: ActionTypes.SET_FILTER,

@@ -5,225 +5,76 @@ import {
   StyleSheet,
   View,
   Text,
-  Dimensions,
   TouchableOpacity,
   Linking,
-  PermissionsAndroid,
-  AsyncStorage,
 } from 'react-native';
 import axios from 'axios';
-import {mergeWith} from 'lodash';
 
-import helpers from '../../utils/helpers';
 import Actions from '../../store/Actions';
+import Logger from '../../utils/Logger';
+import Constants from '../../utils/Constants';
 
-const {width, height} = Dimensions.get('window');
-
-const deltasByDistance = {
-  100: 0.0035,
-  500: 0.016,
-  1000: 0.031,
-};
-
-const ASPECT_RATIO = width / height;
-const LATITUDE_DELTA = 0.0035;
-const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
-const MY_LAST_LOCATION_KEY = 'myLastLocation';
 class App extends React.Component {
-
-  state = {
-    myRegion: {
-      ...App.initRegion,
-    },
-    mapRegion: {
-      ...App.initRegion,
-      latitudeDelta: LATITUDE_DELTA,
-      longitudeDelta: LONGITUDE_DELTA,
-    },
-    normalizedEvents: {
-      mappedData: {},
-      ids: [],
-    },
-    distance: 1000,
-  };
-
-  static initRegion = {
-    latitude: 0,
-    longitude: 0,
-  };
 
   static navigationOptions = {
     title: 'Map',
   };
 
-  async componentDidMount() {
-    try {
-      const value = await AsyncStorage.getItem(MY_LAST_LOCATION_KEY);
-      if (value) {
-        console.log('get');
-        this.setState(
-          this.setCurrentPosition(JSON.parse(value), false)
-        )
-      }
-    } catch (error) {
-      console.error(error);
-    }
-    try {
-      const granted = await PermissionsAndroid.request( // check
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          'title': 'Enable location',
-          'message': 'Location is good \o/',
-        },
-      );
-
-      if (granted) {
-        console.log('You already had permissions');
-        this.getCurrentPosition();
-      } else {
-        console.log('You hadn\'t permissions');
-        this.requestToLocationPermition();
-      }
-    } catch (err) {
-      console.warn(err);
-    }
+  componentDidMount() {
+    this.getNearbyEvents(this.props);
   }
 
-  async requestToLocationPermition() {
+  async getNearbyEvents(props) {
     try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          'title': 'Enable location',
-          'message': 'Location is good \o/',
-        },
-      );
-
-      if (granted) {
-        console.log(granted);
-        console.log('You can use the location');
-        this.getCurrentPosition();
-      } else {
-        console.log('Location permission denied');
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  }
-
-  watchPosition() {
-    this.watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        this.setState(
-          this.setCurrentPosition(position),
-          () => {
-            this.getNearbyEvents();
-          }
-        )
-      },
-      (error) => alert(error.message),
-      {enableHighAccuracy: false, distanceFilter: 1}
-    );
-  }
-
-  getCurrentPosition() {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-      this.setState(
-        this.setCurrentPosition(position),
-        () => {
-          this.watchPosition();
-          this.getNearbyEvents();
+      const {data} = props;
+      const response = await axios.get(Constants.apiUrl, {
+        params: {
+          lat: data.myRegion.latitude,
+          lng: data.myRegion.longitude,
+          distance: data.distance,
+          sort: 'venue',
         }
-      )
-    },
-      (error) => alert(error.message),
-      {enableHighAccuracy: false, distanceFilter: 1}
-    );
-  }
-
-  componentWillUnmount() {
-    navigator.geolocation.clearWatch(this.watchId);
-  }
-
-  setCurrentPosition(position, needToSave = true) {
-    const region = {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    };
-
-    if (needToSave) {
-      this.setToStorage(position);
-    }
-
-    return {
-      mapRegion: mergeWith({}, this.state.mapRegion, region, helpers.customizer),
-      myRegion: mergeWith({}, this.state.myRegion, region, helpers.customizer),
-    };
-  }
-
-  async setToStorage(position) {
-    try {
-      console.log('save');
-      await AsyncStorage.setItem(MY_LAST_LOCATION_KEY, JSON.stringify(position));
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  getNearbyEvents() {
-    axios.get('https://murmuring-escarpment-43610.herokuapp.com/events', {
-      params: {
-        lat: this.state.myRegion.latitude,
-        lng: this.state.myRegion.longitude,
-        distance: this.state.distance,
-        sort: 'venue',
-      }
-    })
-      .then((response) => {
-        this.setState(
-          () => {
-            const event = new schema.Entity('events');
-
-            const events = {
-              events: [event]
-            };
-            const normalizedData = normalize(response.data, events);
-            const mappedEvents = {
-              mappedData: normalizedData.entities.events,
-              ids: normalizedData.result.events,
-            };
-            Actions.setEvents(mappedEvents);
-            return {
-              normalizedEvents: mergeWith({}, this.state.normalizedEvents, mappedEvents, helpers.customizer)
-            }
-          },
-          () => {
-            console.log(this.state);
-          }
-        )
-      })
-      .catch(function (error) {
-        console.dir(error);
       });
+      console.log(response);
+      const event = new schema.Entity('events');
+
+      const events = {
+        events: [event]
+      };
+
+      const normalizedData = normalize(response.data, events);
+      let ids = [];
+      normalizedData.result.events.forEach((id) => {
+        if (ids.indexOf(id) === -1) {
+          ids.push(id)
+        }
+      });
+      const mappedEvents = {
+        mappedData: normalizedData.entities.events,
+        ids,
+      };
+      Actions.setEvents(mappedEvents);
+    } catch (error) {
+      Logger.error(error)
+    }
   }
 
-  setFilter(distance) {
-    this.setState(
-      () => {
-        return mergeWith({}, this.state, {
-          distance,
-          mapRegion: {
-            latitudeDelta: deltasByDistance[distance],
-            longitudeDelta: +(deltasByDistance[distance] * ASPECT_RATIO).toFixed(3),
-          }
-        }, helpers.customizer)
-      },
-      () => {
-        this.getNearbyEvents();
-      }
-    );
-  }
+  // setFilter(distance) { // TODO: move to store
+  //   this.setState(
+  //     () => {
+  //       return mergeWith({}, this.state, {
+  //         distance,
+  //         mapRegion: {
+  //           latitudeDelta: deltasByDistance[distance],
+  //           longitudeDelta: +(deltasByDistance[distance] * ASPECT_RATIO).toFixed(3),
+  //         }
+  //       }, helpers.customizer)
+  //     },
+  //     () => {
+  //       this.getNearbyEvents();
+  //     }
+  //   );
+  // }
 
   onCalloutPress(id) {
     Linking.openURL(`https://www.facebook.com/events/${id}/`);
@@ -234,15 +85,18 @@ class App extends React.Component {
   }
 
   render() {
-    const {mappedData} = this.state.normalizedEvents;
-    const {navigate} = this.props.navigation;
+    const {mappedData, ids} = this.props.data.normalizedEvents;
+    const {data} = this.props;
+    if (!data.mapRegion.longitude) {
+      return null;
+    }
     return (
       <View style={styles.container}>
         <MapView
           provider={this.props.provider}
           style={styles.map}
-          initialRegion={this.state.mapRegion}
-          region={this.state.mapRegion}
+          initialRegion={data.mapRegion}
+          region={data.mapRegion}
           showsCompass={true}
           showScale={true}
           loadingEnabled={true}
@@ -252,24 +106,24 @@ class App extends React.Component {
           <MapView.Marker
             image={require('../../../static/location-icon.png')}
             coordinate={{
-              latitude: this.state.myRegion.latitude,
-              longitude: this.state.myRegion.longitude,
+              latitude: data.myRegion.latitude,
+              longitude: data.myRegion.longitude,
             }}
             styles={styles.marker}
           />
 
           <MapView.Circle
             center={{
-              latitude: this.state.myRegion.latitude,
-              longitude: this.state.myRegion.longitude,
+              latitude: data.myRegion.latitude,
+              longitude: data.myRegion.longitude,
             }}
-            radius={this.state.distance}
+            radius={data.distance}
             strokeColor="#19a3a1"
             fillColor="rgba(153, 227, 225, 0.5)"
             strokeWidth={3}
           />
           {
-            Object.keys(mappedData).map(event => (
+            ids.map(event => (
               <MapView.Marker
                 key={mappedData[event].id}
                 title={mappedData[event].name}
@@ -283,46 +137,6 @@ class App extends React.Component {
             ))
           }
         </MapView>
-        <View style={styles.buttonRow}>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={() => this.setFilter(100)}
-              style={[styles.bubble, styles.button, this.state.distance === 100 ?
-                styles.activeButton : false]}
-            >
-              <Text>100</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={() => this.setFilter(500)}
-              style={[styles.bubble, styles.button, this.state.distance === 500 ?
-                styles.activeButton : false]}
-            >
-              <Text>500</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={() => this.setFilter(1000)}
-              style={[styles.bubble, styles.button, this.state.distance === 1000 ?
-                styles.activeButton : false]}
-            >
-              <Text>1000</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={() => navigate('List')}
-              style={[styles.bubble, styles.button]}
-            >
-              <Text>List</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     );
   }

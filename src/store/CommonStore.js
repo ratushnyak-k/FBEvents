@@ -6,6 +6,11 @@ import {
 import ActionTypes from './ActionTypes';
 import Dispatcher from '../dispatcher/dispatcher';
 import helpers from '../utils/helpers';
+import {
+  LONGITUDE_DELTA,
+  LATITUDE_DELTA,
+  initDistance,
+} from '../utils/Constants';
 
 
 class Store extends ReduceStore {
@@ -13,13 +18,26 @@ class Store extends ReduceStore {
     super(Dispatcher);
   }
 
+  static initRegion = {
+    latitude: undefined,
+    longitude: undefined,
+  };
+
   getInitialState() {
     return {
-      events: {
+      myRegion: {
+        ...Store.initRegion,
+      },
+      mapRegion: {
+        ...Store.initRegion,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
+      },
+      normalizedEvents: {
         mappedData: {},
         ids: [],
       },
-      filters: [],
+      distance: initDistance,
     };
   }
 
@@ -28,7 +46,13 @@ class Store extends ReduceStore {
 
       case ActionTypes.SET_EVENTS:
         return mergeWith({}, state, {
-          events: action.payload
+          normalizedEvents: action.payload
+        }, helpers.customizer);
+
+      case ActionTypes.SET_CURRENT_LOCATION:
+        return mergeWith({}, state, {
+          myRegion: action.payload,
+          mapRegion: action.payload,
         }, helpers.customizer);
 
       default:

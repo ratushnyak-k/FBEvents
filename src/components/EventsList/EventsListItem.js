@@ -25,11 +25,11 @@ const EventsListItem = (props) => {
         <View
           style={styles.textWrap}
         >
-          <View>
+          <View >
             <Text
               style={styles.name}
             >
-              {props.data.name}
+              {props.data.name}<Text style={styles.distance}>{` (${props.data.distance}m)`}</Text>
             </Text>
             <Text
               style={styles.description}
@@ -46,18 +46,27 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     marginVertical: 5,
+    marginHorizontal: 5,
   },
   textWrap: {
+    marginHorizontal: 5,
     backgroundColor: 'transparent',
     flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    width: '67%'
   },
   image: {
-    width: 100,
+    width: '33%',
   },
   name: {
     fontWeight: '500',
+  },
+  description: {
+    marginRight: 50,
+  },
+  distance: {
+    fontStyle: 'italic'
   }
 });
 

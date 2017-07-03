@@ -10,8 +10,10 @@ import EventsListItem from './EventsListItem';
 class EventsList extends React.Component {
   render() {
 
+    const {normalizedEvents} = this.props.data;
+
     const ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-    const dataSource = ds.cloneWithRows(this.props.data.events.ids);
+    const dataSource = ds.cloneWithRows(normalizedEvents.ids);
 
     return (
       <View
@@ -19,7 +21,8 @@ class EventsList extends React.Component {
       >
         <ListView
           dataSource={dataSource}
-          renderRow={(id) => <EventsListItem data={this.props.data.events.mappedData[id]} />}
+          enableEmptySections={true}
+          renderRow={(id) => <EventsListItem data={normalizedEvents.mappedData[id]} />}
         />
       </View>
     )
