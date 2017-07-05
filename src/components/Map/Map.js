@@ -1,18 +1,10 @@
 import React from 'react';
-import {schema, normalize} from 'normalizr';
 import MapView from 'react-native-maps';
 import {
   StyleSheet,
   View,
-  Text,
-  TouchableOpacity,
   Linking,
 } from 'react-native';
-import axios from 'axios';
-
-import Actions from '../../store/Actions';
-import Logger from '../../utils/Logger';
-import Constants from '../../utils/Constants';
 
 class App extends React.Component {
 
@@ -20,44 +12,6 @@ class App extends React.Component {
     title: 'Map',
   };
 
-  componentDidMount() {
-    this.getNearbyEvents(this.props);
-  }
-
-  async getNearbyEvents(props) {
-    try {
-      const {data} = props;
-      const response = await axios.get(Constants.apiUrl, {
-        params: {
-          lat: data.myRegion.latitude,
-          lng: data.myRegion.longitude,
-          distance: data.distance,
-          sort: 'venue',
-        }
-      });
-      console.log(response);
-      const event = new schema.Entity('events');
-
-      const events = {
-        events: [event]
-      };
-
-      const normalizedData = normalize(response.data, events);
-      let ids = [];
-      normalizedData.result.events.forEach((id) => {
-        if (ids.indexOf(id) === -1) {
-          ids.push(id)
-        }
-      });
-      const mappedEvents = {
-        mappedData: normalizedData.entities.events,
-        ids,
-      };
-      Actions.setEvents(mappedEvents);
-    } catch (error) {
-      Logger.error(error)
-    }
-  }
 
   // setFilter(distance) { // TODO: move to store
   //   this.setState(

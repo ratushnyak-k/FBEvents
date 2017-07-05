@@ -1,5 +1,9 @@
 import React from 'react';
 import {Container} from 'flux/utils';
+import {schema, normalize} from 'normalizr';
+import axios from 'axios';
+
+import Constants from '../../utils/Constants';
 
 import Map from './Map';
 import {
@@ -10,7 +14,9 @@ import {
 import Actions from '../../store/Actions';
 import Logger from '../../utils/Logger';
 
-const MY_LAST_LOCATION_KEY = 'myLastLocation';
+const MY_SAVED_LOCATION_KEY = 'mySavedLocation';
+const MY_SAVED_EVENTS_DATA_KEY = 'mySavedEventsData';
+
 import CommonStore from '../../store/CommonStore';
 
 class MapContainer extends React.Component {
@@ -28,10 +34,15 @@ class MapContainer extends React.Component {
 
   async componentDidMount() {
     try {
-      const value = await AsyncStorage.getItem(MY_LAST_LOCATION_KEY);
-      if (value) {
+      const location = await AsyncStorage.getItem(MY_SAVED_LOCATION_KEY);
+      const eventsData = await AsyncStorage.getItem(MY_SAVED_EVENTS_DATA_KEY);
+      if (location) {
         Logger.info('get');
-        this.setCurrentPosition(JSON.parse(value), false)
+        this.setCurrentPosition(JSON.parse(location), false)
+      }
+
+      if (eventsData) {
+        Actions.setEvents(JSON.parse(eventsData));
       }
     } catch (error) {
       Logger.error(error);
@@ -50,28 +61,6 @@ class MapContainer extends React.Component {
         this.getCurrentPosition();
       } else {
         Logger.info('You hadn\'t permissions');
-        this.requestToLocationPermition();
-      }
-    } catch (err) {
-      Logger.error(err);
-    }
-  }
-
-  async requestToLocationPermition() {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          'title': 'Enable location',
-          'message': 'Location is good \o/',
-        },
-      );
-
-      if (granted) {
-        Logger.info('You can use the location');
-        this.getCurrentPosition();
-      } else {
-        Logger.info('Location permission denied');
       }
     } catch (err) {
       Logger.error(err);
@@ -82,9 +71,10 @@ class MapContainer extends React.Component {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         this.setCurrentPosition(position);
+        this.getNearbyEvents(position);
       },
       (error) => Logger.error(error.message),
-      {enableHighAccuracy: false, distanceFilter: 1}
+      {enableHighAccuracy: true, distanceFilter: 1}
     );
   }
 
@@ -95,20 +85,57 @@ class MapContainer extends React.Component {
     };
 
     if (needToSave) {
-      this.setToStorage(position);
+      this.setToStorage(MY_SAVED_LOCATION_KEY, position);
     }
 
     Actions.setCurrentLocation(region);
   }
 
-  async setToStorage(position) {
+  async setToStorage(key, data) {
     try {
       Logger.info('save');
-      await AsyncStorage.setItem(MY_LAST_LOCATION_KEY, JSON.stringify(position));
+      await AsyncStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
       Logger.error(error);
     }
   }
+
+  async getNearbyEvents(position) {
+    try {
+      const {data} = this.state;
+      const response = await axios.get(Constants.apiUrl, {
+        params: {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          distance: data.distance,
+          sort: 'venue',
+        }
+      });
+
+      const event = new schema.Entity('events');
+
+      const events = {
+        events: [event]
+      };
+
+      const normalizedData = normalize(response.data, events);
+      let ids = [];
+      normalizedData.result.events.forEach((id) => {
+        if (ids.indexOf(id) === -1) {
+          ids.push(id)
+        }
+      });
+      const mappedEvents = {
+        mappedData: normalizedData.entities.events,
+        ids,
+      };
+      Actions.setEvents(mappedEvents);
+      this.setToStorage(MY_SAVED_EVENTS_DATA_KEY, mappedEvents)
+    } catch (error) {
+      Logger.error(error)
+    }
+  }
+
 
   render() {
     if (!this.state.data.myRegion.latitude) {
